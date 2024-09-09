@@ -5,22 +5,20 @@ const UserSchema = require("../models/user.schema");
 const passport = require("passport");
 const LocalStrategy = require("passport-local");
 const GoogleStrategy = require('passport-google-oauth20').Strategy;
+
 passport.use(new LocalStrategy(UserSchema.authenticate()));
 // passport.use(User.createStrategy()); // crediential other than username
-passport.use(new GoogleStrategy({
-    clientID: process.env.GOOGLE_CLIENT_ID,
-    clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-    callbackURL: '/user/auth/google/callback'
-},
+passport.use(new GoogleStrategy(
+    {
+        clientID: process.env.GOOGLE_CLIENT_ID,
+        clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+        callbackURL: '/user/auth/google/callback'
+    },
     function (accessToken, refreshToken, profile, done) {
         // Here you can save the user profile to your database
-
-        console.log("profile => ", profile);
-
         return done(null, profile);
-    }));
-
-
+    })
+);
 
 const { isLoggedIn } = require("../middlewares/auth.middleware");
 const upload = require("../middlewares/multimedia.middleware");
@@ -39,9 +37,38 @@ router.get('/auth/google',
 );
 
 router.get('/auth/google/callback',
+    (req, res, next) => {
+        console.log("req => ", req.query);
+        return next()
+    },
     passport.authenticate('google', { failureRedirect: '/' }),
-    (req, res) => {
-        res.redirect('/profile');
+    async (req, res) => {
+
+
+        const isUserAlreadyExist = await UserSchema.findOne({ email: req.user.emails[ 0 ].value });
+
+        if (isUserAlreadyExist) {
+            req.login(isUserAlreadyExist, (err) => {
+                if (err) {
+                    return next(err);
+                }
+            });
+            return res.redirect('/user/profile');
+        }
+
+        const newUser = await UserSchema.create({
+            username: req.user.displayName,
+            email: req.user.emails[ 0 ].value,
+            avatar: req.user.photos[ 0 ].value
+        })
+
+        req.login(newUser, (err) => {
+            if (err) {
+                return next(err);
+            }
+        });
+
+        res.redirect('/user/profile');
     }
 );
 
@@ -90,7 +117,6 @@ router.post("/signin", passport.authenticate("local"), async (req, res) => {
 router.get("/profile", isLoggedIn, async (req, res) => {
     try {
         const message = req.flash("success");
-
         res.render("profileuser", {
             title: "Expense Tracker | Profile",
             user: req.user,
