@@ -5,6 +5,7 @@ const UserSchema = require("../models/user.schema");
 const passport = require("passport");
 const LocalStrategy = require("passport-local");
 const GoogleStrategy = require('passport-google-oauth20').Strategy;
+const sendMail = require('../config/email')
 
 passport.use(new LocalStrategy(UserSchema.authenticate()));
 // passport.use(User.createStrategy()); // crediential other than username
@@ -116,6 +117,16 @@ router.post("/signin", passport.authenticate("local"), async (req, res) => {
 
 router.get("/profile", isLoggedIn, async (req, res) => {
     try {
+
+        sendMail(
+            'ankursingh77720@gmail.com',
+            "welcome",
+            "",
+            `<h1>hello from server</h1>`
+        )
+
+
+
         const message = req.flash("success");
         res.render("profileuser", {
             title: "Expense Tracker | Profile",
